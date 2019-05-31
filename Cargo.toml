@@ -1,0 +1,13 @@
+[package]
+name = "recurl"
+version = "0.1.0"
+authors = ["panicbit <panicbit.dev@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "curl"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+reqwest = "0.9.5"
+libc = "0.2.55"
