@@ -44,3 +44,11 @@ impl<T> Weak<T> {
         self.inner.upgrade().map(|value| f(&value))
     }
 }
+
+impl<T> Clone for Weak<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}

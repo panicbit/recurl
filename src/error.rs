@@ -4,6 +4,18 @@ use std::slice;
 use libc::*;
 use crate::raw::{CURLcode, CURL_ERROR_SIZE};
 
+pub trait ErrorSink {
+    fn with_error_buffer<F>(&self, f: F) where F: FnOnce(&mut ErrorBuffer);
+
+    fn error(&mut self, code: CURLcode::Type, message: impl Into<String>) -> CURLcode::Type {
+        self.with_error_buffer(|error_buffer| {
+            error_buffer.set_error(code, message);
+        });
+
+        code
+    }
+}
+
 pub struct ErrorBuffer {
     buffer: *mut u8,
 }

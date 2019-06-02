@@ -3,7 +3,6 @@
 #[macro_use] extern crate c_str_macro;
 
 use std::io::stdout;
-use std::rc::Rc;
 use std::cell::RefCell;
 use reqwest::RedirectPolicy;
 use reqwest::Method;
@@ -21,9 +20,10 @@ pub mod util;
 mod options;
 mod slist;
 mod mime;
+mod info;
 
 mod error;
-use error::ErrorBuffer;
+use error::{ErrorBuffer, ErrorSink};
 
 mod handle;
 mod borrow_raw;
@@ -58,6 +58,16 @@ impl CURL {
 
     pub fn error(&mut self, code: CURLcode::Type, message: impl Into<String>) -> CURLcode::Type {
         self.error_buffer.borrow_mut().set_error(code, message)
+    }
+
+    pub fn error_buffer(&self) -> &RootRc<RefCell<ErrorBuffer>> {
+        &self.error_buffer
+    }
+}
+
+impl ErrorSink for CURL {
+    fn with_error_buffer<F>(&self, f: F) where F: FnOnce(&mut ErrorBuffer) {
+        f(&mut self.error_buffer.borrow_mut())
     }
 }
 

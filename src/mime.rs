@@ -2,7 +2,10 @@ use crate::CURL;
 use crate::borrow_raw::*;
 use crate::raw::CURLcode::{self, *};
 use crate::rawx::CURL_ZERO_TERMINATED;
+use crate::util::root_rc::Weak;
+use crate::error::{ErrorBuffer, ErrorSink};
 use libc::*;
+use std::cell::RefCell;
 use std::ptr::null_mut;
 use std::ffi::CStr;
 use std::slice;
@@ -12,12 +15,14 @@ pub struct curl_mime {
     // Invariant: curl_mimepart is pinned to the heap,
     // because pointers to it are handed out to C-land
     parts: Vec<Box<curl_mimepart>>,
+    error_buffer: Weak<RefCell<ErrorBuffer>>,
 }
 
 impl curl_mime {
-    pub fn new() -> Box<Self> {
+    pub fn new(curl: Option<&CURL>) -> Box<Self> {
         Box::new(Self {
             parts: Vec::new(),
+            error_buffer: curl.map(|curl| curl.error_buffer().weak()).unwrap_or_default(),
         })
     }
 
@@ -36,19 +41,27 @@ impl curl_mime {
     }
 }
 
+impl ErrorSink for curl_mime {
+    fn with_error_buffer<F>(&self, f: F) where F: FnOnce(&mut ErrorBuffer) {
+        self.error_buffer.with_ref(|buf| f(&mut buf.borrow_mut()));
+    }
+}
+
 #[allow(non_camel_case_types)]
 pub struct curl_mimepart {
     name: Option<String>,
     data: Option<Vec<u8>>,
     mime_type: Option<String>,
+    error_buffer: Weak<RefCell<ErrorBuffer>>,
 }
 
 impl curl_mimepart {
-    fn new() -> Box<Self> {
+    fn new(error_buffer: Weak<RefCell<ErrorBuffer>>) -> Box<Self> {
         Box::new(Self {
             data: None,
             name: None,
             mime_type: None,
+            error_buffer,
         })
     }
 
@@ -63,18 +76,33 @@ impl curl_mimepart {
     fn set_mime_type(&mut self, mime_type: Option<String>) {
         self.mime_type = mime_type;
     }
+
+    fn into_raw(self: Box<Self>) -> *mut Self {
+        Box::into_raw(self)
+    }
+
+    unsafe fn from_raw(this: *mut Self) -> Box<Self> {
+        Box::from_raw(this)
+    }
+}
+
+impl ErrorSink for curl_mimepart {
+    fn with_error_buffer<F>(&self, f: F) where F: FnOnce(&mut ErrorBuffer) {
+        self.error_buffer.with_ref(|buf| f(&mut buf.borrow_mut()));
+    }
 }
 
 #[no_mangle]
-pub unsafe extern fn curl_init(_curl: *mut CURL) -> *mut curl_mime {
-    curl_mime::new().into_raw()
+pub unsafe extern fn curl_mime_init(curl: *mut CURL) -> *mut curl_mime {
+    curl.borrow_raw_opt(curl_mime::new).into_raw()
 }
 
 #[no_mangle]
 pub unsafe extern fn curl_mime_addpart(mime: *mut curl_mime) -> *mut curl_mimepart {
     mime.borrow_raw_mut(|mime| {
-        let part_ptr = Box::into_raw(curl_mimepart::new());
-        let part = Box::from_raw(part_ptr);
+        let error_buffer = mime.error_buffer.clone();
+        let part_ptr = curl_mimepart::new(error_buffer).into_raw();
+        let part = curl_mimepart::from_raw(part_ptr);
 
         mime.add_part(part);
 
@@ -127,7 +155,7 @@ pub unsafe extern fn curl_mime_name(
 
         let name = match CStr::from_ptr(name).to_str() {
             Ok(name) => name.to_owned(),
-            Err(_) => return CURLE_BAD_FUNCTION_ARGUMENT,
+            Err(e) => return part.error(CURLE_BAD_FUNCTION_ARGUMENT, e.to_string()),
         };
 
         part.set_name(Some(name));
@@ -150,7 +178,7 @@ pub unsafe extern fn curl_mime_type(
 
         let mime_type = match CStr::from_ptr(mime_type).to_str() {
             Ok(mime_type) => mime_type.to_owned(),
-            Err(_) => return CURLE_BAD_FUNCTION_ARGUMENT,
+            Err(e) => return part.error(CURLE_BAD_FUNCTION_ARGUMENT, e.to_string()),
         };
 
         part.set_mime_type(Some(mime_type));
