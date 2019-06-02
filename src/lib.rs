@@ -11,11 +11,13 @@ use reqwest::header::{HeaderValue, CONTENT_TYPE};
 use libc::*;
 use crate::borrow_raw::*;
 use crate::raw::CURLcode::{self, *};
+use util::root_rc::RootRc;
 
 #[allow(non_upper_case_globals)]
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
 pub mod raw;
+pub mod util;
 mod options;
 mod slist;
 mod mime;
@@ -38,7 +40,7 @@ pub struct CURL {
     method: Method,
     post_fields: Option<Vec<u8>>,
     mime: Option<mime::curl_mime>,
-    error_buffer: Rc<RefCell<ErrorBuffer>>,
+    error_buffer: RootRc<RefCell<ErrorBuffer>>,
 }
 
 impl CURL {
