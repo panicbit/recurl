@@ -1,8 +1,12 @@
 use std::ptr::null_mut;
 use std::cmp::min;
 use std::slice;
+use std::cell::RefCell;
 use libc::*;
+use crate::util::root_rc::Weak;
 use crate::raw::{CURLcode, CURL_ERROR_SIZE};
+
+pub type WeakErrorBuffer = Weak<RefCell<ErrorBuffer>>;
 
 pub trait ErrorSink {
     fn with_error_buffer<F>(&self, f: F) where F: FnOnce(&mut ErrorBuffer);

@@ -2,10 +2,8 @@ use crate::CURL;
 use crate::borrow_raw::*;
 use crate::raw::CURLcode::{self, *};
 use crate::rawx::CURL_ZERO_TERMINATED;
-use crate::util::root_rc::Weak;
-use crate::error::{ErrorBuffer, ErrorSink};
+use crate::error::*;
 use libc::*;
-use std::cell::RefCell;
 use std::ptr::null_mut;
 use std::ffi::CStr;
 use std::slice;
@@ -15,7 +13,7 @@ pub struct curl_mime {
     // Invariant: curl_mimepart is pinned to the heap,
     // because pointers to it are handed out to C-land
     parts: Vec<Box<curl_mimepart>>,
-    error_buffer: Weak<RefCell<ErrorBuffer>>,
+    error_buffer: WeakErrorBuffer,
 }
 
 impl curl_mime {
@@ -52,11 +50,11 @@ pub struct curl_mimepart {
     name: Option<String>,
     data: Option<Vec<u8>>,
     mime_type: Option<String>,
-    error_buffer: Weak<RefCell<ErrorBuffer>>,
+    error_buffer: WeakErrorBuffer,
 }
 
 impl curl_mimepart {
-    fn new(error_buffer: Weak<RefCell<ErrorBuffer>>) -> Box<Self> {
+    fn new(error_buffer: WeakErrorBuffer) -> Box<Self> {
         Box::new(Self {
             data: None,
             name: None,
