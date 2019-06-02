@@ -1,10 +1,6 @@
 use crate::CURL;
 use crate::borrow_raw::*;
-use crate::raw::CURLcode::{
-    self,
-    CURLE_OK,
-    CURLE_BAD_FUNCTION_ARGUMENT,
-};
+use crate::raw::CURLcode::{self, *};
 use crate::rawx::CURL_ZERO_TERMINATED;
 use libc::*;
 use std::ptr::null_mut;

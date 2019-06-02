@@ -1,17 +1,16 @@
 #![feature(c_variadic)]
-extern crate reqwest;
+
+#[macro_use] extern crate c_str_macro;
 
 use std::io::stdout;
+use std::rc::Rc;
+use std::cell::RefCell;
 use reqwest::RedirectPolicy;
 use reqwest::Method;
 use reqwest::header::{HeaderValue, CONTENT_TYPE};
 use libc::*;
 use crate::borrow_raw::*;
-use crate::raw::CURLcode::{
-    self,
-    CURLE_OK,
-    CURLE_BAD_FUNCTION_ARGUMENT,
-};
+use crate::raw::CURLcode::{self, *};
 
 #[allow(non_upper_case_globals)]
 #[allow(non_camel_case_types)]
@@ -21,19 +20,25 @@ mod options;
 mod slist;
 mod mime;
 
+mod error;
+use error::ErrorBuffer;
+
 mod handle;
 mod borrow_raw;
 
 mod rawx {
-    pub const CURL_ZERO_TERMINATED: usize = usize::max_value() - 1;
+    use libc::*;
+    pub const CURL_ZERO_TERMINATED: size_t = size_t::max_value() - 1;
 }
 
 pub struct CURL {
     url: Option<String>,
+    last_effective_url: Option<String>,
     follow_location: bool,
     method: Method,
     post_fields: Option<Vec<u8>>,
     mime: Option<mime::curl_mime>,
+    error_buffer: Rc<RefCell<ErrorBuffer>>,
 }
 
 impl CURL {
@@ -44,7 +49,13 @@ impl CURL {
             method: Method::GET,
             mime: None,
             post_fields: None,
+            last_effective_url: None,
+            error_buffer: <_>::default(),
         }
+    }
+
+    pub fn error(&mut self, code: CURLcode::Type, message: impl Into<String>) -> CURLcode::Type {
+        self.error_buffer.borrow_mut().set_error(code, message)
     }
 }
 
@@ -71,11 +82,12 @@ pub unsafe extern fn curl_easy_cleanup(curl: *mut CURL) {
 #[no_mangle]
 pub extern fn curl_easy_strerror(code: CURLcode::Type) -> *const c_char {
     match code {
-        CURLcode::CURLE_BAD_FUNCTION_ARGUMENT => "Bad function argument\0".as_ptr() as _,
-        CURLcode::CURLE_UNKNOWN_OPTION => "Unknown option\0".as_ptr() as _,
-        CURLcode::CURLE_NOT_BUILT_IN => "Not built-in\0".as_ptr() as _,
-        _ => "Unknown error code\0".as_ptr() as _,
+        CURLE_BAD_FUNCTION_ARGUMENT => c_str!("Bad function argument"),
+        CURLE_UNKNOWN_OPTION => c_str!("Unknown option"),
+        CURLE_NOT_BUILT_IN => c_str!("Not built-in"),
+        _ => c_str!("Unknown error code"),
     }
+    .as_ptr()
 }
 
 #[no_mangle]
@@ -107,11 +119,11 @@ pub unsafe extern fn curl_easy_perform(this: *mut CURL) -> CURLcode::Type {
 
         let mut response = match request.send() {
             Ok(response) => response,
-            Err(_) => return CURLcode::CURLE_HTTP_RETURNED_ERROR,
+            Err(e) => return this.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
         };
 
         if let Err(_) = response.copy_to(&mut stdout()) {
-            return CURLcode::CURLE_HTTP_RETURNED_ERROR;
+            return CURLE_HTTP_RETURNED_ERROR;
         }
 
         CURLE_OK
@@ -125,7 +137,7 @@ pub unsafe extern fn curl_free(ptr: *mut c_void) {
         return
     }
 
-    unimplemented!("curl_free")
+    // TODO
 }
 
 #[no_mangle]
