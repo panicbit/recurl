@@ -26,6 +26,7 @@ impl<T> Deref for RootRc<T> {
     }
 }
 
+#[derive(Default)]
 pub struct Weak<T> {
     inner: rc::Weak<T>,
 }
