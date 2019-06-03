@@ -2,32 +2,25 @@ use std::io::stdout;
 use std::cell::RefCell;
 use std::ffi::{CString, CStr};
 use reqwest::RedirectPolicy;
-use reqwest::Method;
 use reqwest::header::{HeaderValue, CONTENT_TYPE};
-use crate::mime;
+use crate::{Options, mime};
 use crate::raw::CURLcode::{self, *};
 use crate::borrow_raw::*;
 use crate::util::root_rc::RootRc;
 use crate::error::{ErrorBuffer, ErrorSink};
 
 pub struct CURL {
-    pub(crate) url: Option<String>,
     pub(crate) last_effective_url: Option<CString>,
-    pub(crate) follow_location: bool,
-    pub(crate) method: Method,
-    pub(crate) post_fields: Option<Vec<u8>>,
     mime: Option<mime::curl_mime>,
     error_buffer: RootRc<RefCell<ErrorBuffer>>,
+    pub(crate) options: Options,
 }
 
 impl CURL {
     pub fn init() -> Box<CURL> {
         Box::new(Self {
-            url: None,
-            follow_location: false,
-            method: Method::GET,
+            options: <_>::default(),
             mime: None,
-            post_fields: None,
             last_effective_url: None,
             error_buffer: <_>::default(),
         })
@@ -56,23 +49,26 @@ impl CURL {
     }
 
     pub fn perform(&mut self) -> CURLcode::Type {
-        let url = match self.url.as_ref() {
+        let options = &mut self.options;
+
+        let url = match options.url.as_ref() {
             Some(url) => url,
             None => return CURLE_OK,
         };
 
-        let redirect_policy = match self.follow_location {
+        let redirect_policy = match options.follow_location {
             true => RedirectPolicy::limited(30),
             false => RedirectPolicy::none(),
         };
+
         let client = reqwest::Client::builder()
             .redirect(redirect_policy)
             .build()
             .unwrap();
 
-        let mut request = client.request(self.method.clone(), url);
+        let mut request = client.request(options.method.clone(), url);
 
-        if let Some(post_fields) = &self.post_fields {
+        if let Some(post_fields) = &options.post_fields {
             request = request.body(post_fields.to_owned());
             request = request.header(
                 CONTENT_TYPE,

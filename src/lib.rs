@@ -8,10 +8,12 @@ use crate::raw::CURLcode::{self, *};
 mod curl;
 use crate::curl::CURL;
 
+mod options;
+use crate::options::Options;
+
 #[allow(warnings)]
 mod raw;
 mod util;
-mod options;
 mod slist;
 mod mime;
 mod info;

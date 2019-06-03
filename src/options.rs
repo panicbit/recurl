@@ -8,18 +8,27 @@ use crate::raw::{
     CURLcode::{self, CURLE_OK, CURLE_BAD_FUNCTION_ARGUMENT},
 };
 
-impl CURL {
-    pub fn set_option_url(&mut self, url: Option<String>) {
-        self.url = url;
-    }
+pub struct Options {
+    pub url: Option<String>,
+    pub follow_location: bool,
+    pub post_fields: Option<Vec<u8>>,
+    pub method: Method,
+}
 
-    pub fn set_option_follow_location(&mut self, state: bool) {
-        self.follow_location = state;
+impl Options {
+    fn new() -> Self {
+        Self {
+            url: None,
+            follow_location: false,
+            post_fields: None,
+            method: Method::GET,
+        }
     }
+}
 
-    pub fn set_option_post_fields(&mut self, fields: Option<Vec<u8>>) {
-        self.method = Method::POST;
-        self.post_fields = fields;
+impl Default for Options {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -45,23 +54,26 @@ unsafe fn set_option_url(curl: &mut CURL, url: *const c_char) -> CURLcode::Type 
         Ok(url) => url.to_owned(),
         Err(_) => return CURLcode::CURLE_URL_MALFORMAT,
     };
-    curl.set_option_url(Some(url));
+
+    curl.options.url = Some(url);
+    
     CURLE_OK
 }
 
 unsafe fn set_option_follow_location(curl: &mut CURL, state: c_long) -> CURLcode::Type {
-    curl.set_option_follow_location(state == 1);
+    curl.options.follow_location = state == 1;
     CURLE_OK
 }
 
 unsafe fn set_option_post_fields(curl: &mut CURL, fields: *const c_char) -> CURLcode::Type {
     if fields.is_null() {
-        curl.set_option_post_fields(None);
+        curl.options.post_fields = None;
         return CURLE_OK;
     }
 
     let fields = CStr::from_ptr(fields).to_bytes().to_owned();
-    curl.set_option_post_fields(Some(fields));
+    curl.options.post_fields = Some(fields);
+    curl.options.method = Method::POST;
 
     CURLE_OK
 }
