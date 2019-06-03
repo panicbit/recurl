@@ -1,11 +1,12 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, VaList};
+use std::str::Utf8Error;
 use libc::*;
 use reqwest::Method;
 use crate::CURL;
 use crate::borrow_raw::*;
 use crate::raw::{
-    CURLoption,
-    CURLcode::{self, CURLE_OK, CURLE_BAD_FUNCTION_ARGUMENT},
+    CURLoption::{self, *},
+    CURLcode::{self, *},
 };
 
 pub struct Options {
@@ -36,44 +37,74 @@ impl Default for Options {
 pub unsafe extern fn curl_easy_setopt(
     this: *mut CURL,
     option: CURLoption::Type,
-    mut args: ...
+    args: ...
 ) -> CURLcode::Type {
-    this.borrow_raw_mut(|this| {
+    this.borrow_raw_mut(|curl| {
         match option {
-            CURLoption::CURLOPT_URL => set_option_url(this, args.arg()),
-            CURLoption::CURLOPT_FOLLOWLOCATION => set_option_follow_location(this, args.arg()),
-            CURLoption::CURLOPT_POSTFIELDS => set_option_post_fields(this, args.arg()),
+            CURLOPT_URL => owned_str_opt(args, |url| match url {
+                Ok(url) => { curl.options.url = url; CURLE_OK },
+                Err(e) => curl.error(CURLE_URL_MALFORMAT, e.to_string()),
+            }),
+
+            CURLOPT_FOLLOWLOCATION => long_opt(args, |state| {
+                curl.options.follow_location = state == 1;
+                CURLE_OK
+            }),
+
+            CURLOPT_POSTFIELDS => bytes_opt(args, |fields| {
+                curl.options.method = Method::POST;
+                curl.options.post_fields = fields.map(<_>::to_owned);
+                CURLE_OK
+            }),
+
             _ => CURLcode::CURLE_UNKNOWN_OPTION
         }
     })
     .unwrap_or(CURLE_BAD_FUNCTION_ARGUMENT)
 }
 
-unsafe fn set_option_url(curl: &mut CURL, url: *const c_char) -> CURLcode::Type {
-    let url = match CStr::from_ptr(url).to_str() {
-        Ok(url) => url.to_owned(),
-        Err(_) => return CURLcode::CURLE_URL_MALFORMAT,
-    };
+unsafe fn str_opt<F, R>(mut args: VaList, f: F) -> R
+where
+    F: FnOnce(Result<Option<&str>, Utf8Error>) -> R
+{
+    let str = args.arg::<*const c_char>();
 
-    curl.options.url = Some(url);
-    
-    CURLE_OK
-}
-
-unsafe fn set_option_follow_location(curl: &mut CURL, state: c_long) -> CURLcode::Type {
-    curl.options.follow_location = state == 1;
-    CURLE_OK
-}
-
-unsafe fn set_option_post_fields(curl: &mut CURL, fields: *const c_char) -> CURLcode::Type {
-    if fields.is_null() {
-        curl.options.post_fields = None;
-        return CURLE_OK;
+    if str.is_null() {
+        return f(Ok(None));
     }
 
-    let fields = CStr::from_ptr(fields).to_bytes().to_owned();
-    curl.options.post_fields = Some(fields);
-    curl.options.method = Method::POST;
+    let str = CStr::from_ptr(str).to_str().map(Some);
+    f(str)
+}
 
-    CURLE_OK
+unsafe fn owned_str_opt<F, R>(args: VaList, f: F) -> R
+where
+    F: FnOnce(Result<Option<String>, Utf8Error>) -> R
+{
+    str_opt(args, |str| {
+        let str = str.map(|str| str.map(<_>::to_owned));
+        f(str)
+    })
+}
+
+unsafe fn bytes_opt<F, R>(mut args: VaList, f: F) -> R
+where
+    F: FnOnce(Option<&[u8]>) -> R
+{
+    let bytes = args.arg::<*const c_char>();
+
+    if bytes.is_null() {
+        return f(None);
+    }
+
+    let bytes = CStr::from_ptr(bytes).to_bytes();
+    f(Some(bytes))
+}
+
+unsafe fn long_opt<F, R>(mut args: VaList, f: F) -> R
+where
+    F: FnOnce(c_long) -> R
+{
+    let value = args.arg::<c_long>();
+    f(value)
 }
