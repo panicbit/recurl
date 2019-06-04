@@ -8,21 +8,24 @@ use crate::raw::{
     CURLoption::{self, *},
     CURLcode::{self, *},
 };
+use crate::error::RootRcErrorBuffer;
 
 pub struct Options {
     pub url: Option<String>,
     pub follow_location: bool,
     pub post_fields: Option<Vec<u8>>,
     pub method: Method,
+    pub error_buffer: RootRcErrorBuffer,
 }
 
 impl Options {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             url: None,
             follow_location: false,
             post_fields: None,
             method: Method::GET,
+            error_buffer: <_>::default(),
         }
     }
 }
@@ -37,7 +40,7 @@ impl Default for Options {
 pub unsafe extern fn curl_easy_setopt(
     this: *mut CURL,
     option: CURLoption::Type,
-    args: ...
+    mut args: ...
 ) -> CURLcode::Type {
     this.borrow_raw_mut(|curl| {
         match option {
@@ -56,6 +59,14 @@ pub unsafe extern fn curl_easy_setopt(
                 curl.options.post_fields = fields.map(<_>::to_owned);
                 CURLE_OK
             }),
+
+            CURLOPT_ERRORBUFFER => {
+                let buffer = args.arg::<*mut c_char>();
+                curl.options.error_buffer
+                    .borrow_mut()
+                    .set_buffer(buffer);
+                CURLE_OK
+            },
 
             _ => CURLcode::CURLE_UNKNOWN_OPTION
         }

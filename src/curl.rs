@@ -10,10 +10,9 @@ use crate::util::root_rc::RootRc;
 use crate::error::{ErrorBuffer, ErrorSink};
 
 pub struct CURL {
+    pub(crate) options: Options,
     pub(crate) last_effective_url: Option<CString>,
     mime: Option<mime::curl_mime>,
-    error_buffer: RootRc<RefCell<ErrorBuffer>>,
-    pub(crate) options: Options,
 }
 
 impl CURL {
@@ -22,7 +21,6 @@ impl CURL {
             options: <_>::default(),
             mime: None,
             last_effective_url: None,
-            error_buffer: <_>::default(),
         })
     }
 
@@ -35,11 +33,11 @@ impl CURL {
     }
 
     pub fn error(&mut self, code: CURLcode::Type, message: impl Into<String>) -> CURLcode::Type {
-        self.error_buffer.borrow_mut().set_error(code, message)
+        self.options.error_buffer.borrow_mut().set_error(code, message)
     }
 
     pub fn error_buffer(&self) -> &RootRc<RefCell<ErrorBuffer>> {
-        &self.error_buffer
+        &self.options.error_buffer
     }
 
     pub fn last_effective_url(&self) -> &CStr {
@@ -94,13 +92,20 @@ impl CURL {
 
 impl ErrorSink for CURL {
     fn with_error_buffer<F>(&self, f: F) where F: FnOnce(&mut ErrorBuffer) {
-        f(&mut self.error_buffer.borrow_mut())
+        f(&mut self.options.error_buffer.borrow_mut())
     }
 }
 
 #[no_mangle]
 pub extern fn curl_easy_init() -> *mut CURL {
     CURL::init().into_raw()
+}
+
+#[no_mangle]
+pub unsafe extern fn curl_easy_reset(this: *mut CURL) {
+    this.borrow_raw_mut(|this| {
+        this.options = <_>::default();
+    });
 }
 
 #[no_mangle]

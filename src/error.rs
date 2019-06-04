@@ -3,9 +3,10 @@ use std::cmp::min;
 use std::slice;
 use std::cell::RefCell;
 use libc::*;
-use crate::util::root_rc::Weak;
+use crate::util::root_rc::{RootRc, Weak};
 use crate::raw::{CURLcode, CURL_ERROR_SIZE};
 
+pub type RootRcErrorBuffer = RootRc<RefCell<ErrorBuffer>>;
 pub type WeakErrorBuffer = Weak<RefCell<ErrorBuffer>>;
 
 pub trait ErrorSink {
