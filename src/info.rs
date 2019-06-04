@@ -30,7 +30,7 @@ pub unsafe extern fn curl_easy_getinfo(
             CURLINFO_FILETIME => long_info(args, curl.file_time.map(|t| t.timestamp()).unwrap_or(-1)),
             CURLINFO_CONTENT_LENGTH_DOWNLOAD => long_info(args, curl.content_length_download.and_then(|l| i64::try_from(l).ok()).unwrap_or(-1)),
             CURLINFO_SIZE_DOWNLOAD => long_info(args, curl.size_download as c_long),
-            CURLINFO_CONDITION_UNMET => long_info(args, 1), // TODO: implement conditions
+            CURLINFO_CONDITION_UNMET => long_info(args, 0), // TODO: implement conditions
             CURLINFO_RESPONSE_CODE => long_info(args, curl.response_code as c_long),
             CURLINFO_TOTAL_TIME => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_TOTAL_TIME)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_NAMELOOKUP_TIME => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_NAMELOOKUP_TIME)); return CURLE_BAD_FUNCTION_ARGUMENT},
@@ -68,7 +68,6 @@ pub unsafe extern fn curl_easy_getinfo(
             CURLINFO_PRIMARY_IP => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_PRIMARY_IP)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_APPCONNECT_TIME => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_APPCONNECT_TIME)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_CERTINFO => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_CERTINFO)); return CURLE_BAD_FUNCTION_ARGUMENT},
-            CURLINFO_CONDITION_UNMET => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_CONDITION_UNMET)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_RTSP_SESSION_ID => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_RTSP_SESSION_ID)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_RTSP_CLIENT_CSEQ => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_RTSP_CLIENT_CSEQ)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_RTSP_SERVER_CSEQ => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_RTSP_SERVER_CSEQ)); return CURLE_BAD_FUNCTION_ARGUMENT},
