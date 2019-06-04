@@ -2,7 +2,7 @@ use std::ffi::{VaList, CStr, CString};
 use std::convert::TryFrom;
 use libc::*;
 use chrono::{DateTime, FixedOffset};
-use crate::borrow_raw::*;
+use crate::util::borrow_raw::*;
 use crate::CURL;
 use crate::raw::CURLINFO::{self, *};
 use crate::raw::CURLcode::{self, *};

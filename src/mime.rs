@@ -1,5 +1,5 @@
 use crate::CURL;
-use crate::borrow_raw::*;
+use crate::util::borrow_raw::*;
 use crate::raw::CURLcode::{self, *};
 use crate::rawx::CURL_ZERO_TERMINATED;
 use crate::error::*;

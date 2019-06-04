@@ -7,8 +7,10 @@ use libc::*;
 use std::io::{self, Write};
 use crate::{Options, Infos, mime};
 use crate::raw::CURLcode::{self, *};
-use crate::borrow_raw::*;
-use crate::util::root_rc::RootRc;
+use crate::util::{
+    borrow_raw::*,
+    root_rc::RootRc,
+};
 use crate::error::{ErrorBuffer, ErrorSink};
 pub struct CURL {
     pub options: Options,

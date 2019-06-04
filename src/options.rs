@@ -6,7 +6,7 @@ use std::ptr::null_mut;
 use libc::*;
 use reqwest::Method;
 use crate::CURL;
-use crate::borrow_raw::*;
+use crate::util::borrow_raw::*;
 use crate::raw::{
     stdout,
     CURLoption::{self, *},
