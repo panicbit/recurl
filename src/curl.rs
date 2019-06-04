@@ -17,6 +17,7 @@ pub struct CURL {
     mime: Option<mime::curl_mime>,
     pub(crate) file_time: Option<DateTime<FixedOffset>>,
     pub(crate) content_length_download: Option<u64>,
+    pub(crate) size_download: u64,
 }
 
 impl CURL {
@@ -27,6 +28,7 @@ impl CURL {
             last_effective_url: None,
             file_time: None,
             content_length_download: None,
+            size_download: 0,
         })
     }
 
@@ -102,9 +104,10 @@ impl CURL {
             write_data: self.options.write_data,
         };
 
-        if let Err(_) = response.copy_to(&mut writer) {
-            return CURLE_HTTP_RETURNED_ERROR;
-        }
+        self.size_download = match response.copy_to(&mut writer) {
+            Ok(size_download) => size_download,
+            Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
+        };
 
         if !self.options.no_progress {
             // TODO: Improve progress with progress_streams and indicatif
