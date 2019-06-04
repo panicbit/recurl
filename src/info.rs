@@ -112,7 +112,10 @@ pub unsafe extern fn curl_easy_getinfo(
             CURLINFO_REDIRECT_TIME_T => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_REDIRECT_TIME_T)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_APPCONNECT_TIME_T => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_APPCONNECT_TIME_T)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_LASTONE => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_LASTONE)); return CURLE_BAD_FUNCTION_ARGUMENT},
-            _ => return CURLE_BAD_FUNCTION_ARGUMENT,
+            _ => {
+                eprintln!("recurl: unimplemented info ({})", info);
+                return CURLE_BAD_FUNCTION_ARGUMENT;
+            }
         };
 
         CURLE_OK
