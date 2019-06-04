@@ -1,4 +1,3 @@
-use std::io::stdout;
 use std::cell::RefCell;
 use std::ffi::{CString, CStr};
 use reqwest::RedirectPolicy;
@@ -16,7 +15,8 @@ pub struct CURL {
     pub(crate) options: Options,
     pub(crate) last_effective_url: Option<CString>,
     mime: Option<mime::curl_mime>,
-    file_time: Option<DateTime<FixedOffset>>,
+    pub(crate) file_time: Option<DateTime<FixedOffset>>,
+    pub(crate) content_length_download: Option<u64>,
 }
 
 impl CURL {
@@ -26,6 +26,7 @@ impl CURL {
             mime: None,
             last_effective_url: None,
             file_time: None,
+            content_length_download: None,
         })
     }
 
@@ -84,6 +85,8 @@ impl CURL {
             Ok(response) => response,
             Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
         };
+
+        self.content_length_download = response.content_length();
 
         if self.options.file_time {
             self.file_time = response.headers()
