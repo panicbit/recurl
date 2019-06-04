@@ -12,3 +12,4 @@ crate-type = ["cdylib", "staticlib"]
 reqwest = "0.9.17"
 libc = "0.2.58"
 c_str_macro = "1.0.2"
+chrono = "0.4.6"

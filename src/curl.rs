@@ -2,7 +2,8 @@ use std::io::stdout;
 use std::cell::RefCell;
 use std::ffi::{CString, CStr};
 use reqwest::RedirectPolicy;
-use reqwest::header::{HeaderValue, CONTENT_TYPE};
+use reqwest::header::{HeaderValue, CONTENT_TYPE, LAST_MODIFIED};
+use chrono::{DateTime, FixedOffset};
 use crate::{Options, mime};
 use crate::raw::CURLcode::{self, *};
 use crate::borrow_raw::*;
@@ -13,6 +14,7 @@ pub struct CURL {
     pub(crate) options: Options,
     pub(crate) last_effective_url: Option<CString>,
     mime: Option<mime::curl_mime>,
+    file_time: Option<DateTime<FixedOffset>>,
 }
 
 impl CURL {
@@ -21,6 +23,7 @@ impl CURL {
             options: <_>::default(),
             mime: None,
             last_effective_url: None,
+            file_time: None,
         })
     }
 
@@ -80,6 +83,12 @@ impl CURL {
             Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
         };
 
+        if self.options.file_time {
+            self.file_time = response.headers()
+                .get(LAST_MODIFIED)
+                .and_then(parse_last_modified);
+        }
+
         // TODO: Improve handling of null in URLs
         self.last_effective_url = CStr::from_bytes_with_nul(response.url().as_str().as_bytes()).ok().map(<_>::into);
 
@@ -120,4 +129,10 @@ pub unsafe extern fn curl_easy_cleanup(curl: *mut CURL) {
 pub unsafe extern fn curl_easy_perform(this: *mut CURL) -> CURLcode::Type {
     this.borrow_raw_mut(CURL::perform)
         .unwrap_or(CURLE_BAD_FUNCTION_ARGUMENT)
+}
+
+fn parse_last_modified(last_modified: &HeaderValue) -> Option<DateTime<FixedOffset>> {
+    last_modified.to_str().ok().and_then(|last_modified| {
+        DateTime::parse_from_rfc2822(last_modified.trim()).ok()
+    })
 }

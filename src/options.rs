@@ -20,6 +20,7 @@ pub struct Options {
     pub method: Method,
     pub error_buffer: RootRcErrorBuffer,
     pub connect_timeout: Option<Duration>,
+    pub file_time: bool,
 }
 
 impl Options {
@@ -31,6 +32,7 @@ impl Options {
             method: Method::GET,
             error_buffer: <_>::default(),
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
+            file_time: false,
         }
     }
 }
@@ -54,8 +56,8 @@ pub unsafe extern fn curl_easy_setopt(
                 Err(e) => curl.error(CURLE_URL_MALFORMAT, e.to_string()),
             }),
 
-            CURLOPT_FOLLOWLOCATION => long_opt(args, |state| {
-                curl.options.follow_location = state == 1;
+            CURLOPT_FOLLOWLOCATION => bool_opt(args, |state| {
+                curl.options.follow_location = state;
                 CURLE_OK
             }),
 
@@ -88,6 +90,12 @@ pub unsafe extern fn curl_easy_setopt(
                 };
                 CURLE_OK
             }),
+
+            CURLOPT_FILETIME => bool_opt(args, |state| {
+                curl.options.file_time = state;
+                CURLE_OK
+            }),
+
             _ => {
                 eprintln!("recurl: unknown option ({})", option);
                 CURLcode::CURLE_UNKNOWN_OPTION
@@ -141,4 +149,11 @@ where
 {
     let value = args.arg::<c_long>();
     f(value)
+}
+
+unsafe fn bool_opt<F, R>(args: VaList, f: F) -> R
+where
+    F: FnOnce(bool) -> R
+{
+    long_opt(args, |value| f(value == 1))
 }
