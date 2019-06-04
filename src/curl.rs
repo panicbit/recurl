@@ -61,6 +61,7 @@ impl CURL {
 
         let client = reqwest::Client::builder()
             .redirect(redirect_policy)
+            .connect_timeout(options.connect_timeout)
             .build()
             .unwrap();
 

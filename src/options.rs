@@ -1,5 +1,6 @@
 use std::ffi::{CStr, VaList};
 use std::str::Utf8Error;
+use std::time::Duration;
 use libc::*;
 use reqwest::Method;
 use crate::CURL;
@@ -10,12 +11,15 @@ use crate::raw::{
 };
 use crate::error::RootRcErrorBuffer;
 
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(300);
+
 pub struct Options {
     pub url: Option<String>,
     pub follow_location: bool,
     pub post_fields: Option<Vec<u8>>,
     pub method: Method,
     pub error_buffer: RootRcErrorBuffer,
+    pub connect_timeout: Option<Duration>,
 }
 
 impl Options {
@@ -26,6 +30,7 @@ impl Options {
             post_fields: None,
             method: Method::GET,
             error_buffer: <_>::default(),
+            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
         }
     }
 }
@@ -68,7 +73,25 @@ pub unsafe extern fn curl_easy_setopt(
                 CURLE_OK
             },
 
-            _ => CURLcode::CURLE_UNKNOWN_OPTION
+            CURLOPT_CONNECTTIMEOUT => long_opt(args, |timeout| {
+                curl.options.connect_timeout = Some(match timeout {
+                    0 => DEFAULT_CONNECT_TIMEOUT,
+                    _ => Duration::from_secs(timeout as u64),
+                });
+                CURLE_OK
+            }),
+
+            CURLOPT_CONNECTTIMEOUT_MS => long_opt(args, |timeout| {
+                curl.options.connect_timeout = match timeout {
+                    0 => None,
+                    _ => Some(Duration::from_millis(timeout as u64)),
+                };
+                CURLE_OK
+            }),
+            _ => {
+                eprintln!("recurl: unknown option ({})", option);
+                CURLcode::CURLE_UNKNOWN_OPTION
+            }
         }
     })
     .unwrap_or(CURLE_BAD_FUNCTION_ARGUMENT)
