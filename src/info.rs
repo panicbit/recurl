@@ -1,10 +1,31 @@
-use std::ffi::{VaList, CStr};
+use std::ffi::{VaList, CStr, CString};
 use std::convert::TryFrom;
 use libc::*;
+use chrono::{DateTime, FixedOffset};
 use crate::borrow_raw::*;
 use crate::CURL;
 use crate::raw::CURLINFO::{self, *};
 use crate::raw::CURLcode::{self, *};
+
+pub struct Infos {
+    pub last_effective_url: Option<CString>,
+    pub file_time: Option<DateTime<FixedOffset>>,
+    pub content_length_download: Option<u64>,
+    pub size_download: u64,
+    pub response_code: u16,
+}
+
+impl Infos {
+    pub fn new() -> Self {
+        Self {
+            last_effective_url: None,
+            file_time: None,
+            content_length_download: None,
+            size_download: 0,
+            response_code: 0,
+        }
+    }
+}
 
 unsafe fn str_info(mut args: VaList, str: &CStr) {
     let ret = args.arg::<*mut *const c_char>();
@@ -24,14 +45,15 @@ pub unsafe extern fn curl_easy_getinfo(
 ) -> CURLcode::Type 
 {
     curl.borrow_raw_mut(|curl| {
+        let infos = &curl.infos;
         match info {
             // CURLINFO_NONE => CURLE_BAD_FUNCTION_ARGUMENT,
             CURLINFO_EFFECTIVE_URL => str_info(args, curl.last_effective_url()),
-            CURLINFO_FILETIME => long_info(args, curl.file_time.map(|t| t.timestamp()).unwrap_or(-1)),
-            CURLINFO_CONTENT_LENGTH_DOWNLOAD => long_info(args, curl.content_length_download.and_then(|l| i64::try_from(l).ok()).unwrap_or(-1)),
-            CURLINFO_SIZE_DOWNLOAD => long_info(args, curl.size_download as c_long),
+            CURLINFO_FILETIME => long_info(args, infos.file_time.map(|t| t.timestamp()).unwrap_or(-1)),
+            CURLINFO_CONTENT_LENGTH_DOWNLOAD => long_info(args, infos.content_length_download.and_then(|l| i64::try_from(l).ok()).unwrap_or(-1)),
+            CURLINFO_SIZE_DOWNLOAD => long_info(args, infos.size_download as c_long),
             CURLINFO_CONDITION_UNMET => long_info(args, 0), // TODO: implement conditions
-            CURLINFO_RESPONSE_CODE => long_info(args, curl.response_code as c_long),
+            CURLINFO_RESPONSE_CODE => long_info(args, infos.response_code as c_long),
             CURLINFO_TOTAL_TIME => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_TOTAL_TIME)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_NAMELOOKUP_TIME => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_NAMELOOKUP_TIME)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_CONNECT_TIME => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_CONNECT_TIME)); return CURLE_BAD_FUNCTION_ARGUMENT},

@@ -1,4 +1,4 @@
 
- - [ ] Collect getinfo values in a separate struct
+ - [X] Collect getinfo values in a separate struct
  - [ ] Implement XFERINFO
 

@@ -11,12 +11,14 @@ use crate::curl::CURL;
 mod options;
 use crate::options::Options;
 
+mod info;
+use crate::info::Infos;
+
 #[allow(warnings)]
 mod raw;
 mod util;
 mod slist;
 mod mime;
-mod info;
 mod error;
 mod handle;
 mod borrow_raw;

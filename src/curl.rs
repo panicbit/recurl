@@ -5,32 +5,23 @@ use reqwest::header::{HeaderValue, CONTENT_TYPE, LAST_MODIFIED};
 use chrono::{DateTime, FixedOffset};
 use libc::*;
 use std::io::{self, Write};
-use crate::{Options, mime};
+use crate::{Options, Infos, mime};
 use crate::raw::CURLcode::{self, *};
 use crate::borrow_raw::*;
 use crate::util::root_rc::RootRc;
 use crate::error::{ErrorBuffer, ErrorSink};
-
 pub struct CURL {
-    pub(crate) options: Options,
-    pub(crate) last_effective_url: Option<CString>,
+    pub options: Options,
+    pub infos: Infos,
     mime: Option<mime::curl_mime>,
-    pub(crate) file_time: Option<DateTime<FixedOffset>>,
-    pub(crate) content_length_download: Option<u64>,
-    pub(crate) size_download: u64,
-    pub(crate) response_code: u16,
 }
 
 impl CURL {
     pub fn init() -> Box<CURL> {
         Box::new(Self {
-            options: <_>::default(),
+            options: Options::new(),
+            infos: Infos::new(),
             mime: None,
-            last_effective_url: None,
-            file_time: None,
-            content_length_download: None,
-            size_download: 0,
-            response_code: 0,
         })
     }
 
@@ -51,13 +42,15 @@ impl CURL {
     }
 
     pub fn last_effective_url(&self) -> &CStr {
-        self.last_effective_url.as_ref()
+        self.infos
+            .last_effective_url.as_ref()
             .map(CString::as_c_str)
             .unwrap_or_default()
     }
 
     pub fn perform(&mut self) -> CURLcode::Type {
         let options = &mut self.options;
+        let infos = &mut self.infos;
 
         let url = match options.url.as_ref() {
             Some(url) => url,
@@ -85,22 +78,23 @@ impl CURL {
             );
         }
 
+        eprintln!("recurl: Requesting {:?}", options.url);
         let mut response = match request.send() {
             Ok(response) => response,
             Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
         };
 
-        self.response_code = response.status().as_u16();
-        self.content_length_download = response.content_length();
+        infos.response_code = response.status().as_u16();
+        infos.content_length_download = response.content_length();
 
         if options.file_time {
-            self.file_time = response.headers()
+            infos.file_time = response.headers()
                 .get(LAST_MODIFIED)
                 .and_then(parse_last_modified);
         }
 
         // TODO: Improve handling of null in URLs
-        self.last_effective_url = CStr::from_bytes_with_nul(response.url().as_str().as_bytes()).ok().map(<_>::into);
+        infos.last_effective_url = CStr::from_bytes_with_nul(response.url().as_str().as_bytes()).ok().map(<_>::into);
 
         let header_function = options.header_function.or(
             Some(options.write_function)
@@ -115,7 +109,7 @@ impl CURL {
                 write!(&mut field, "\r\n").ok();
 
                 unsafe {
-                    let res = header_function(field.as_ptr() as *const c_char, 1, field.len(), self.options.header_data);
+                    let res = header_function(field.as_ptr() as *const c_char, 1, field.len(), options.header_data);
                     if res != field.len() {
                         return self.error(CURLE_WRITE_ERROR, "Error while handling headers");
                     }
@@ -124,17 +118,17 @@ impl CURL {
         }
 
         let mut writer = FFIWriter {
-            write_function: self.options.write_function,
-            write_data: self.options.write_data,
+            write_function: options.write_function,
+            write_data: options.write_data,
         };
 
         // TODO: Handle CURL_WRITEFUNC_PAUSE
-        self.size_download = match response.copy_to(&mut writer) {
+        infos.size_download = match response.copy_to(&mut writer) {
             Ok(size_download) => size_download,
             Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
         };
 
-        if !self.options.no_progress {
+        if !options.no_progress {
             // TODO: Improve progress with progress_streams and indicatif
             println!("Progress: 100%");
         }
