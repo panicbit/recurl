@@ -20,7 +20,6 @@ mod util;
 mod slist;
 mod mime;
 mod error;
-mod handle;
 mod borrow_raw;
 
 mod rawx {
