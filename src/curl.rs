@@ -4,6 +4,8 @@ use std::ffi::{CString, CStr};
 use reqwest::RedirectPolicy;
 use reqwest::header::{HeaderValue, CONTENT_TYPE, LAST_MODIFIED};
 use chrono::{DateTime, FixedOffset};
+use libc::*;
+use std::io::{self, Write};
 use crate::{Options, mime};
 use crate::raw::CURLcode::{self, *};
 use crate::borrow_raw::*;
@@ -92,7 +94,12 @@ impl CURL {
         // TODO: Improve handling of null in URLs
         self.last_effective_url = CStr::from_bytes_with_nul(response.url().as_str().as_bytes()).ok().map(<_>::into);
 
-        if let Err(_) = response.copy_to(&mut stdout()) {
+        let mut writer = FFIWriter {
+            write_function: self.options.write_function,
+            write_data: self.options.write_data,
+        };
+
+        if let Err(_) = response.copy_to(&mut writer) {
             return CURLE_HTTP_RETURNED_ERROR;
         }
 
@@ -140,4 +147,31 @@ fn parse_last_modified(last_modified: &HeaderValue) -> Option<DateTime<FixedOffs
     last_modified.to_str().ok().and_then(|last_modified| {
         DateTime::parse_from_rfc2822(last_modified.trim()).ok()
     })
+}
+
+struct FFIWriter {
+    write_function: unsafe extern fn(
+        ptr: *const c_char,
+        size: size_t,
+        nmemb: size_t,
+        userdata: *mut c_void,
+    ) -> size_t,
+    write_data: *mut c_void,
+}
+
+impl Write for FFIWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        unsafe {
+            Ok((self.write_function)(
+                bytes.as_ptr() as *mut c_char,
+                1,
+                bytes.len(),
+                self.write_data,
+            ))
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }

@@ -6,6 +6,7 @@ use reqwest::Method;
 use crate::CURL;
 use crate::borrow_raw::*;
 use crate::raw::{
+    stdout,
     CURLoption::{self, *},
     CURLcode::{self, *},
 };
@@ -22,6 +23,13 @@ pub struct Options {
     pub connect_timeout: Option<Duration>,
     pub file_time: bool,
     pub no_progress: bool,
+    pub write_function: unsafe extern fn(
+        ptr: *const c_char,
+        size: size_t,
+        nmemb: size_t,
+        userdata: *mut c_void,
+    ) -> size_t,
+    pub write_data: *mut c_void,
 }
 
 impl Options {
@@ -35,6 +43,8 @@ impl Options {
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             file_time: false,
             no_progress: true,
+            write_function: default_write_function,
+            write_data: unsafe { stdout as *mut c_void },
         }
     }
 }
@@ -103,6 +113,11 @@ pub unsafe extern fn curl_easy_setopt(
                 CURLE_OK
             }),
 
+            CURLOPT_WRITEDATA => {
+                curl.options.write_data = args.arg::<*mut c_void>();
+                CURLE_OK
+            },
+
             _ => {
                 eprintln!("recurl: unknown option ({})", option);
                 CURLcode::CURLE_UNKNOWN_OPTION
@@ -163,4 +178,8 @@ where
     F: FnOnce(bool) -> R
 {
     long_opt(args, |value| f(value == 1))
+}
+
+unsafe extern fn default_write_function(ptr: *const c_char, size: size_t, nmemb: size_t, userdata: *mut c_void) -> size_t {
+    fwrite(ptr as *const c_void, size, nmemb, userdata as *mut FILE)
 }
