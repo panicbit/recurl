@@ -1,6 +1,8 @@
 use std::ffi::{CStr, VaList};
 use std::str::Utf8Error;
 use std::time::Duration;
+use std::mem::transmute;
+use std::ptr::null_mut;
 use libc::*;
 use reqwest::Method;
 use crate::CURL;
@@ -11,6 +13,13 @@ use crate::raw::{
     CURLcode::{self, *},
 };
 use crate::error::RootRcErrorBuffer;
+
+type WriteFunction = unsafe extern fn(
+    ptr: *const c_char,
+    size: size_t,
+    nitems: size_t,
+    userdata: *mut c_void,
+) -> size_t;
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(300);
 
@@ -23,13 +32,10 @@ pub struct Options {
     pub connect_timeout: Option<Duration>,
     pub file_time: bool,
     pub no_progress: bool,
-    pub write_function: unsafe extern fn(
-        ptr: *const c_char,
-        size: size_t,
-        nmemb: size_t,
-        userdata: *mut c_void,
-    ) -> size_t,
+    pub write_function: WriteFunction,
     pub write_data: *mut c_void,
+    pub header_function: Option<WriteFunction>,
+    pub header_data: *mut c_void,
 }
 
 impl Options {
@@ -45,6 +51,8 @@ impl Options {
             no_progress: true,
             write_function: default_write_function,
             write_data: unsafe { stdout as *mut c_void },
+            header_function: None,
+            header_data: null_mut(),
         }
     }
 }
@@ -117,6 +125,18 @@ pub unsafe extern fn curl_easy_setopt(
                 curl.options.write_data = args.arg::<*mut c_void>();
                 CURLE_OK
             },
+
+            CURLOPT_HEADERFUNCTION => {
+                let ptr = args.arg::<*const c_void>();
+                let header_function = transmute::<_, WriteFunction>(ptr);
+                curl.options.header_function = Some(header_function).filter(|_| !ptr.is_null());
+                CURLE_OK
+            }
+
+            CURLOPT_HEADERDATA => {
+                curl.options.header_data = args.arg::<*mut c_void>();
+                CURLE_OK
+            }
 
             _ => {
                 eprintln!("recurl: unknown option ({})", option);

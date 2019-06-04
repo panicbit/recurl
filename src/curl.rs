@@ -93,7 +93,7 @@ impl CURL {
         self.response_code = response.status().as_u16();
         self.content_length_download = response.content_length();
 
-        if self.options.file_time {
+        if options.file_time {
             self.file_time = response.headers()
                 .get(LAST_MODIFIED)
                 .and_then(parse_last_modified);
@@ -102,11 +102,33 @@ impl CURL {
         // TODO: Improve handling of null in URLs
         self.last_effective_url = CStr::from_bytes_with_nul(response.url().as_str().as_bytes()).ok().map(<_>::into);
 
+        let header_function = options.header_function.or(
+            Some(options.write_function)
+            .filter(|_| !options.header_data.is_null())
+        );
+        // TODO: Include ALL header data, not just fields
+        if let Some(header_function) = header_function {
+            for (header, value) in response.headers() {
+                let mut field = Vec::with_capacity(header.as_str().len() + 2 + value.len() + 2);
+                write!(&mut field, "{}: ", header).ok();
+                field.extend_from_slice(value.as_bytes());
+                write!(&mut field, "\r\n").ok();
+
+                unsafe {
+                    let res = header_function(field.as_ptr() as *const c_char, 1, field.len(), self.options.header_data);
+                    if res != field.len() {
+                        return self.error(CURLE_WRITE_ERROR, "Error while handling headers");
+                    }
+                }
+            }
+        }
+
         let mut writer = FFIWriter {
             write_function: self.options.write_function,
             write_data: self.options.write_data,
         };
 
+        // TODO: Handle CURL_WRITEFUNC_PAUSE
         self.size_download = match response.copy_to(&mut writer) {
             Ok(size_download) => size_download,
             Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
