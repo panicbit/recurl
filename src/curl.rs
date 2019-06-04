@@ -96,6 +96,11 @@ impl CURL {
             return CURLE_HTTP_RETURNED_ERROR;
         }
 
+        if !self.options.no_progress {
+            // TODO: Improve progress with progress_streams and indicatif
+            println!("Progress: 100%");
+        }
+
         CURLE_OK
     }
 }

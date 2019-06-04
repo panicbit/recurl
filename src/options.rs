@@ -21,6 +21,7 @@ pub struct Options {
     pub error_buffer: RootRcErrorBuffer,
     pub connect_timeout: Option<Duration>,
     pub file_time: bool,
+    pub no_progress: bool,
 }
 
 impl Options {
@@ -33,6 +34,7 @@ impl Options {
             error_buffer: <_>::default(),
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             file_time: false,
+            no_progress: true,
         }
     }
 }
@@ -93,6 +95,11 @@ pub unsafe extern fn curl_easy_setopt(
 
             CURLOPT_FILETIME => bool_opt(args, |state| {
                 curl.options.file_time = state;
+                CURLE_OK
+            }),
+
+            CURLOPT_NOPROGRESS => bool_opt(args, |state| {
+                curl.options.no_progress = state;
                 CURLE_OK
             }),
 
