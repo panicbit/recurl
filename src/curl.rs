@@ -18,6 +18,7 @@ pub struct CURL {
     pub(crate) file_time: Option<DateTime<FixedOffset>>,
     pub(crate) content_length_download: Option<u64>,
     pub(crate) size_download: u64,
+    pub(crate) response_code: u16,
 }
 
 impl CURL {
@@ -29,6 +30,7 @@ impl CURL {
             file_time: None,
             content_length_download: None,
             size_download: 0,
+            response_code: 0,
         })
     }
 
@@ -88,6 +90,7 @@ impl CURL {
             Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
         };
 
+        self.response_code = response.status().as_u16();
         self.content_length_download = response.content_length();
 
         if self.options.file_time {
