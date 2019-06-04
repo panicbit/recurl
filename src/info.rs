@@ -30,6 +30,7 @@ pub unsafe extern fn curl_easy_getinfo(
             CURLINFO_FILETIME => long_info(args, curl.file_time.map(|t| t.timestamp()).unwrap_or(-1)),
             CURLINFO_CONTENT_LENGTH_DOWNLOAD => long_info(args, curl.content_length_download.and_then(|l| i64::try_from(l).ok()).unwrap_or(-1)),
             CURLINFO_SIZE_DOWNLOAD => long_info(args, curl.size_download as c_long),
+            CURLINFO_CONDITION_UNMET => long_info(args, 1), // TODO: implement conditions
             CURLINFO_RESPONSE_CODE => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_RESPONSE_CODE)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_TOTAL_TIME => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_TOTAL_TIME)); return CURLE_BAD_FUNCTION_ARGUMENT},
             CURLINFO_NAMELOOKUP_TIME => {eprintln!("recurl: unimplemented '{}'", stringify!(CURLINFO_NAMELOOKUP_TIME)); return CURLE_BAD_FUNCTION_ARGUMENT},
