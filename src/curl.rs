@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::ffi::{CString, CStr};
+use std::io::{self, Write};
 use reqwest::RedirectPolicy;
 use reqwest::header::{HeaderValue, CONTENT_TYPE, LAST_MODIFIED};
 use chrono::{DateTime, FixedOffset};
 use libc::*;
-use std::io::{self, Write};
 use crate::{Options, Infos, mime};
 use crate::raw::CURLcode::{self, *};
 use crate::util::{

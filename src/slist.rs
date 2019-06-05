@@ -46,10 +46,8 @@ pub unsafe extern fn curl_slist_append(
         Err(_) => return null_mut(),
     };
 
-    let this = match this.is_null() {
-        true => &mut *curl_slist::new().into_raw(),
-        false => &mut *this,
-    };
+    let this = this.as_mut()
+        .unwrap_or_else(|| &mut *curl_slist::new().into_raw());
 
     this.append(value);
 

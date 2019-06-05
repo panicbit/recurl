@@ -17,11 +17,7 @@ impl<T> BorrowRaw<T> for *const T {
     where
         F: FnOnce(Option<&T>) -> R
     {
-        if self.is_null() {
-            f(None)
-        } else {
-            f(Some(&**self))
-        }
+        f(self.as_ref())
     }
 }
 
@@ -30,11 +26,7 @@ impl<T> BorrowRaw<T> for *mut T {
     where
         F: FnOnce(Option<&T>) -> R
     {
-        if self.is_null() {
-            f(None)
-        } else {
-            f(Some(&**self))
-        }
+        f(self.as_ref())
     }
 }
 
@@ -56,10 +48,6 @@ impl<T> BorrowRawMut<T> for *mut T {
     where
         F: FnOnce(Option<&mut T>) -> R
     {
-        if self.is_null() {
-            f(None)
-        } else {
-            f(Some(&mut **self))
-        }
+        f(self.as_mut())
     }
 }
