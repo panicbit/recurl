@@ -133,6 +133,10 @@ impl CURL {
         let mut reader = ProgressReader::new(response, |dl_progress| {
             dl_now += dl_progress as curl_off_t;
 
+            if options.no_progress {
+                return;
+            }
+
             // TOOD: Allow xfer_info_function to abort dl
             unsafe {
                 let dl_total = infos.content_length_download.unwrap_or(0) as curl_off_t;
@@ -151,11 +155,6 @@ impl CURL {
             Ok(size_download) => size_download,
             Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
         };
-
-        if !options.no_progress {
-            // TODO: Improve progress with progress_streams and indicatif
-            println!("Progress: 100%");
-        }
 
         CURLE_OK
     }
