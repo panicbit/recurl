@@ -150,7 +150,9 @@ pub unsafe extern fn curl_easy_setopt(
             }
 
             _ => {
-                eprintln!("recurl: unknown option ({})", option);
+                if cfg!(debug_assertions) {
+                    eprintln!("recurl: unknown option ({})", option);
+                }
                 CURLE_UNKNOWN_OPTION
             }
         }
