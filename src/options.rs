@@ -251,14 +251,14 @@ unsafe extern fn default_xfer_info_function(
     if dl_total == 0 {
         print!("DL: {} ", dl_now);
     } else {
-        let percent = dl_now as f32 / dl_total as f32;
+        let percent = dl_now as f32 / dl_total as f32 * 100.;
         print!("DL: {}/{} ({:.2}%) ", dl_now, dl_total, percent)
     };
 
     if ul_total == 0 {
         print!("UL: {}", ul_now);
     } else {
-        let percent = ul_now as f32 / ul_total as f32;
+        let percent = ul_now as f32 / ul_total as f32 * 100.;
         print!("UL: {}/{} ({:.2}%)", ul_now, ul_total, percent)
     };
 
