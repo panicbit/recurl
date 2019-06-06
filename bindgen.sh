@@ -1,5 +1,5 @@
 
 bindgen \
 	--ctypes-prefix '::libc' \
-	--constified-enum-module '.*' \
+	--default-enum-style moduleconsts \
 	/usr/include/curl/curl.h > src/raw.rs
