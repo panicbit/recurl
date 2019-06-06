@@ -1,3 +1,4 @@
+#![forbid(unreachable_patterns)]
 #![feature(c_variadic)]
 
 #[macro_use] extern crate c_str_macro;
@@ -23,7 +24,10 @@ mod error;
 
 mod rawx {
     use libc::*;
+    use crate::raw::CURLoption::{Type as CURLoption, *};
+
     pub const CURL_ZERO_TERMINATED: size_t = size_t::max_value() - 1;
+    pub const CURLOPT_XFERINFODATA: CURLoption = CURLOPT_PROGRESSDATA;
 }
 
 #[no_mangle]

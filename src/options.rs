@@ -11,15 +11,10 @@ use crate::raw::{
     stdout,
     CURLoption::{self, *},
     CURLcode::{self, *},
+    curl_off_t,
 };
+use crate::rawx::*;
 use crate::error::RootRcErrorBuffer;
-
-type WriteFunction = unsafe extern fn(
-    ptr: *const c_char,
-    size: size_t,
-    nitems: size_t,
-    userdata: *mut c_void,
-) -> size_t;
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(300);
 
@@ -36,6 +31,8 @@ pub struct Options {
     pub write_data: *mut c_void,
     pub header_function: Option<WriteFunction>,
     pub header_data: *mut c_void,
+    pub xfer_info_function: XferInfoFunction,
+    pub xfer_info_data: *mut c_void,
 }
 
 impl Options {
@@ -53,6 +50,8 @@ impl Options {
             write_data: unsafe { stdout as *mut c_void },
             header_function: None,
             header_data: null_mut(),
+            xfer_info_function: default_xfer_info_function,
+            xfer_info_data: null_mut(),
         }
     }
 }
@@ -138,6 +137,18 @@ pub unsafe extern fn curl_easy_setopt(
                 CURLE_OK
             }
 
+            CURLOPT_XFERINFOFUNCTION => {
+                let ptr = args.arg::<*const c_void>();
+                let xfer_info_function = transmute::<_, XferInfoFunction>(ptr);
+                curl.options.xfer_info_function = xfer_info_function;
+                CURLE_OK
+            }
+
+            CURLOPT_XFERINFODATA => {
+                curl.options.xfer_info_data = args.arg::<*mut c_void>();
+                CURLE_OK
+            }
+
             _ => {
                 eprintln!("recurl: unknown option ({})", option);
                 CURLcode::CURLE_UNKNOWN_OPTION
@@ -200,6 +211,58 @@ where
     long_opt(args, |value| f(value == 1))
 }
 
-unsafe extern fn default_write_function(ptr: *const c_char, size: size_t, nmemb: size_t, userdata: *mut c_void) -> size_t {
-    fwrite(ptr as *const c_void, size, nmemb, userdata as *mut FILE)
+
+type WriteFunction = unsafe extern fn(
+    ptr: *const c_char,
+    size: size_t,
+    nitems: size_t,
+    userdata: *mut c_void,
+) -> size_t;
+
+unsafe extern fn default_write_function(
+    ptr: *const c_char,
+    size: size_t,
+    nmemb: size_t,
+    userdata: *mut c_void
+) -> size_t {
+    fwrite(ptr as *const c_void,size, nmemb, userdata as *mut FILE)
+}
+
+type XferInfoFunction = unsafe extern fn(
+    userdata: *mut c_void,
+    dl_total: curl_off_t,
+    dl_now: curl_off_t,
+    ul_total: curl_off_t,
+    ul_now: curl_off_t,
+) -> c_int;
+
+unsafe extern fn default_xfer_info_function(
+    _userdata: *mut c_void,
+    dl_total: curl_off_t,
+    dl_now: curl_off_t,
+    ul_total: curl_off_t,
+    ul_now: curl_off_t,
+) -> c_int {
+    if [dl_now, dl_total, ul_now, ul_total].iter().all(|&n| n == 0) {
+        println!("DL: ? UL: ? ");
+        return 0;
+    }
+
+    if dl_total == 0 {
+        print!("DL: {} ", dl_now);
+    } else {
+        let percent = dl_now as f32 / dl_total as f32;
+        print!("DL: {}/{} ({:.2}%) ", dl_now, dl_total, percent)
+    };
+
+    if ul_total == 0 {
+        print!("UL: {}", ul_now);
+    } else {
+        let percent = ul_now as f32 / ul_total as f32;
+        print!("UL: {}/{} ({:.2}%)", ul_now, ul_total, percent)
+    };
+
+    println!();
+
+    0
 }

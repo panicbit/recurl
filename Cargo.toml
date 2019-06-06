@@ -13,3 +13,8 @@ reqwest = "0.9.17"
 libc = "0.2.58"
 c_str_macro = "1.0.2"
 chrono = "0.4.6"
+
+[dependencies.progress-streams]
+version = "1.0.0"
+git = "https://github.com/panicbit/progress-streams"
+branch = "fn_mut"

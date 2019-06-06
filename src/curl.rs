@@ -4,9 +4,13 @@ use std::io::{self, Write};
 use reqwest::RedirectPolicy;
 use reqwest::header::{HeaderValue, CONTENT_TYPE, LAST_MODIFIED};
 use chrono::{DateTime, FixedOffset};
+use progress_streams::ProgressReader;
 use libc::*;
 use crate::{Options, Infos, mime};
-use crate::raw::CURLcode::{self, *};
+use crate::raw::{
+    CURLcode::{self, *},
+    curl_off_t,
+};
 use crate::util::{
     borrow_raw::*,
     root_rc::RootRc,
@@ -125,8 +129,25 @@ impl CURL {
             write_data: options.write_data,
         };
 
+        let mut dl_now = 0;
+        let mut reader = ProgressReader::new(response, |dl_progress| {
+            dl_now += dl_progress as curl_off_t;
+
+            // TOOD: Allow xfer_info_function to abort dl
+            unsafe {
+                let dl_total = infos.content_length_download.unwrap_or(0) as curl_off_t;
+                (options.xfer_info_function)(
+                    options.xfer_info_data,
+                    dl_total,
+                    dl_now,
+                    0,
+                    0,
+                );
+            }
+        });
+
         // TODO: Handle CURL_WRITEFUNC_PAUSE
-        infos.size_download = match response.copy_to(&mut writer) {
+        infos.size_download = match io::copy(&mut reader, &mut writer) {
             Ok(size_download) => size_download,
             Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
         };
