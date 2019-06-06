@@ -129,9 +129,10 @@ impl CURL {
             write_data: options.write_data,
         };
 
-        let mut dl_now = 0;
+        infos.size_download = 0;
+
         let mut reader = ProgressReader::new(response, |dl_progress| {
-            dl_now += dl_progress as curl_off_t;
+            infos.size_download += dl_progress as u64;
 
             if options.no_progress {
                 return;
@@ -143,7 +144,7 @@ impl CURL {
                 (options.xfer_info_function)(
                     options.xfer_info_data,
                     dl_total,
-                    dl_now,
+                    infos.size_download as curl_off_t,
                     0,
                     0,
                 );
