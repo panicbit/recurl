@@ -98,10 +98,11 @@ impl CURL {
         // TODO: Improve handling of null in URLs
         infos.last_effective_url = CStr::from_bytes_with_nul(response.url().as_str().as_bytes()).ok().map(<_>::into);
 
-        let header_function = options.header_function.or(
-            Some(options.write_function)
-            .filter(|_| !options.header_data.is_null())
-        );
+        let mut header_function = options.header_function;
+        if !options.header_data.is_null() {
+            header_function.get_or_insert(options.write_function);
+        }
+
         // TODO: Include ALL header data, not just fields
         if let Some(header_function) = header_function {
             for (header, value) in response.headers() {
