@@ -86,6 +86,7 @@ impl CURL {
 
         eprintln!("recurl: Requesting {:?}", options.url);
         let mut response = match request.send() {
+        let response = match request.send() {
             Ok(response) => response,
             Err(e) => return self.error(CURLE_HTTP_RETURNED_ERROR, e.to_string()),
         };
