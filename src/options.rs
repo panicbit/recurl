@@ -9,8 +9,8 @@ use crate::CURL;
 use crate::util::borrow_raw::*;
 use crate::raw::{
     stdout,
-    CURLoption::{self, *},
-    CURLcode::{self, *},
+    CURLoption::{Type as CURLoption, *},
+    CURLcode::{Type as CURLcode, *},
     curl_off_t,
 };
 use crate::rawx::*;
@@ -65,9 +65,9 @@ impl Default for Options {
 #[no_mangle]
 pub unsafe extern fn curl_easy_setopt(
     this: *mut CURL,
-    option: CURLoption::Type,
+    option: CURLoption,
     mut args: ...
-) -> CURLcode::Type {
+) -> CURLcode {
     this.borrow_raw_mut(|curl| {
         match option {
             CURLOPT_URL => owned_str_opt(args, |url| match url {
@@ -151,7 +151,7 @@ pub unsafe extern fn curl_easy_setopt(
 
             _ => {
                 eprintln!("recurl: unknown option ({})", option);
-                CURLcode::CURLE_UNKNOWN_OPTION
+                CURLE_UNKNOWN_OPTION
             }
         }
     })
